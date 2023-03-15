@@ -95,7 +95,27 @@ void printData(struct dataItem* root, FILE* outputFile, int* count) {
 //TODO
 int main(int argc, char* argv[])
 {
-	readFiles("test.txt");
+    if ( argc < 5 ) {
+        printf("You have entered insufficient number of arguments! Usage: proctopk <K> <outfile> <N> <infile1> .... <infileN>\n");
+        return -1;
+    }
+    char* outfile = argv[3];
+    int n = atoi(argv[4]);
+    printf("%d", n);
+    char* fileNames[n];
+    for ( int i = 0; i < n; i++ ) {
+        fileNames[i] = argv[i + 5];
+    }
+    
+
+	readFiles("in1.txt");
 	printf("file is read");
+    FILE* outputFile;
+    outputFile = fopen(outfile, "w");
+    for ( int i = 0; i < n; i++ ) {
+        fprintf(outputFile, "%s", fileNames[i]);
+    }
+    
+    fclose(outputFile);
 	return 0;
 }
