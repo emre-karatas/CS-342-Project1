@@ -72,6 +72,20 @@ void readFiles(char* fileName)
         head = pushData(head, current,index);
     }
 }
+void printData(struct dataItem* root, FILE* outputFile, int* count) {
+    if ( root == NULL ) {
+        return;
+    }
+    if ( (*count) == 0 ) {
+        fprintf(outputFile, "%s %d", root->word, root->wordCount);
+    }
+    else {
+        fprintf(outputFile, "\n%s %d", root->word, root->wordCount);
+    }
+    (*count)++;
+    printTree(root->next, outputFile, count);
+}
+
 //TODO
 int main(int argc, char* argv[])
 {
