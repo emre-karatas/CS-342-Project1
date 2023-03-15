@@ -11,20 +11,18 @@ struct dataItem
 	int wordCount;
 };
 // function to push word count and word itself to the linked list structure
-void pushData(struct dataItem** head, char* wordToAdd, int wordCount)
+void pushData(struct dataItem** head, char* wordToAdd,int wordCount)
 {
 	struct dataItem* newDataItem = (struct dataItem*)malloc(sizeof(struct dataItem)); 
   
-
     	newDataItem->word  = wordToAdd; 
   
-    	newDataItem->wordCount = wordCount;
+    	newDataItem->wordCount = wordCount; 
 
     	newDataItem->next = *head;
     	
     	(*head) = newDataItem; 
 }
-//TODO
 void sortDataItems(struct dataItem** anItem)
 {
 	char tempWord[64];
@@ -48,6 +46,31 @@ void sortDataItems(struct dataItem** anItem)
 		}
 	}
 
+}
+struct dataItem* head = NULL;
+void readFiles(char* fileName)
+{
+	FILE* file;
+	char word[64];
+	file = fopen(fileName,"r");
+	
+	while ( fscanf(file, "%s", word) == 1 ) 
+	{
+
+        	// might leak memory
+        	char* current = strdup(word);
+        
+        	for ( int i = 0; current[i] != '\0'; i++ ) 
+        	{
+            		if ( current[i] >= 'a' && current[i] <= 'z' ) 
+            		{
+                		current[i] = current[i] - 32;
+            		}
+            	}
+        }
+  	int index = 1;
+        head = pushData(head, current,index);
+    }
 }
 //TODO
 int main(int argc, char* argv[])
