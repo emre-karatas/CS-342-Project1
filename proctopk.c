@@ -1,17 +1,23 @@
-#include <stdio.h> 
-#include <stdlib.h> 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <mqueue.h>
+#include <time.h>
+#include <sys/time.h>
+
 
 // Ipek Oztas - Emre Karatas
 // a data structure to keep words and counts together. This is a linked list application.
 struct dataItem
 {
-	char word[64];
+	char* word;
 	struct dataItem* next;
 	int wordCount;
 };
 // function to push word count and word itself to the linked list structure
-void pushData(struct dataItem** head, char* wordToAdd,int wordCount)
+void pushData(struct dataItem* head, char* wordToAdd,int wordCount)
 {
 	struct dataItem* newDataItem = (struct dataItem*)malloc(sizeof(struct dataItem)); 
   
@@ -19,17 +25,17 @@ void pushData(struct dataItem** head, char* wordToAdd,int wordCount)
   
     	newDataItem->wordCount = wordCount; 
 
-    	newDataItem->next = *head;
+    	newDataItem->next = head;
     	
-    	(*head) = newDataItem; 
+    	head = newDataItem; 
 }
-void sortDataItems(struct dataItem** anItem)
+void sortDataItems(struct dataItem* anItem)
 {
-	char tempWord[64];
+	char* tempWord;
 	int tempCount;
-	struct dataItem temp1;
-	struct dataItem temp2;
-	for(temp1 = *anItem; temp1!=NULL; temp1 = temp1->next)
+	struct dataItem *temp1;
+	struct dataItem *temp2;
+	for(temp1 = anItem; temp1!=NULL; temp1 = temp1->next)
 	{
 		for(temp2=temp1->next;temp2!=NULL;temp2=temp2->next)
 		{
@@ -53,12 +59,13 @@ void readFiles(char* fileName)
 	FILE* file;
 	char word[64];
 	file = fopen(fileName,"r");
+	char* current;
 	
 	while ( fscanf(file, "%s", word) == 1 ) 
 	{
 
         	// might leak memory
-        	char* current = strdup(word);
+        	current = strdup(word);
         
         	for ( int i = 0; current[i] != '\0'; i++ ) 
         	{
@@ -69,8 +76,7 @@ void readFiles(char* fileName)
             	}
         }
   	int index = 1;
-        head = pushData(head, current,index);
-    }
+        pushData(head, current,index);
 }
 void printData(struct dataItem* root, FILE* outputFile, int* count) {
     if ( root == NULL ) {
@@ -83,12 +89,13 @@ void printData(struct dataItem* root, FILE* outputFile, int* count) {
         fprintf(outputFile, "\n%s %d", root->word, root->wordCount);
     }
     (*count)++;
-    printTree(root->next, outputFile, count);
+    printData(root->next, outputFile, count);
 }
 
 //TODO
 int main(int argc, char* argv[])
 {
-
+	readFiles("test.txt");
+	printf("file is read");
 	return 0;
 }
