@@ -14,21 +14,48 @@ struct dataItem
 {
 	char* word;
 	struct dataItem* next;
+	struct dataItem* previous;
 	int wordCount;
 };
+struct dataItem* head = NULL;
 // function to push word count and word itself to the linked list structure
-void pushData(struct dataItem* head, char* wordToAdd,int wordCount)
+struct dataItem* pushData(struct dataItem* head, char* word)
 {
-	struct dataItem* newDataItem = (struct dataItem*)malloc(sizeof(struct dataItem)); 
+	if (head == NULL)
+	{
+		struct dataItem* newDataItem = (struct dataItem*)malloc(sizeof(struct dataItem)); 
   
-    	newDataItem->word  = wordToAdd; 
+    		newDataItem->word  = word; 
   
-    	newDataItem->wordCount = wordCount; 
-
-    	newDataItem->next = head;
+    		newDataItem->wordCount = 1; 
+    		
+    		newDataItem->previous = NULL;
+    		
+    		newDataItem->next = head;
     	
-    	head = newDataItem; 
+    		head = newDataItem; 
+    	
+	
+	}
+	else
+	{
+	 	if ( strcmp(word,head->word) < 0 ) 
+	 	{
+            		head->previous = pushData(head->previous, word);
+        	}
+        	else if ( strcmp(word,head->word) > 0) 
+        	{
+            		head->next = pushData(head->next, word);
+        	}
+        	else 
+        	{
+            		head->wordCount = head->wordCount + 1;
+        	}
+    	}
+    return head;
+	
 }
+ 
 void sortDataItems(struct dataItem* anItem)
 {
 	char* tempWord;
@@ -53,7 +80,6 @@ void sortDataItems(struct dataItem* anItem)
 	}
 
 }
-struct dataItem* head = NULL;
 void readFiles(char* fileName)
 {
 	FILE* file;
@@ -75,27 +101,38 @@ void readFiles(char* fileName)
             		}
             	}
         }
-  	int index = 1;
-        pushData(head, current,index);
+        head = pushData(head, current);
 }
-void printData(struct dataItem* root, FILE* outputFile, int* count) {
-    if ( root == NULL ) {
+void printData(struct dataItem* head, FILE* outputFile, int* count) {
+    if ( head == NULL ) 
+    {
         return;
     }
-    if ( (*count) == 0 ) {
-        fprintf(outputFile, "%s %d", root->word, root->wordCount);
+    if ( (*count) == 0 ) 
+    {
+        fprintf(outputFile, "%s %d", head->word, head->wordCount);
     }
-    else {
-        fprintf(outputFile, "\n%s %d", root->word, root->wordCount);
+    else 
+    {
+        fprintf(outputFile, "\n%s %d", head->word, head->wordCount);
     }
     (*count)++;
-    printData(root->next, outputFile, count);
+    printData(head->next, outputFile, count);
 }
 
+void printOutputFile()
+{
+	FILE* outputFile;
+    	outputFile = fopen("out.txt", "w");
+    	int count = 0;
+
+    	printData(head, outputFile, &count);
+    	fclose(outputFile);
+}
 //TODO
 int main(int argc, char* argv[])
 {
-    if ( argc < 5 ) {
+	if ( argc < 5 ) {
         printf("You have entered insufficient number of arguments! Usage: proctopk <K> <outfile> <N> <infile1> .... <infileN>\n");
         return -1;
     }
