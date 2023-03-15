@@ -6,7 +6,7 @@
 // a data structure to keep words and counts together. This is a linked list application.
 struct dataItem
 {
-	char* word;
+	char word[64];
 	struct dataItem* next;
 	int wordCount;
 };
@@ -27,6 +27,26 @@ void pushData(struct dataItem** head, char* wordToAdd, int wordCount)
 //TODO
 void sortDataItems(struct dataItem** anItem)
 {
+	char tempWord[64];
+	int tempCount;
+	struct dataItem temp1;
+	struct dataItem temp2;
+	for(temp1 = *anItem; temp1!=NULL; temp1 = temp1->next)
+	{
+		for(temp2=temp1->next;temp2!=NULL;temp2=temp2->next)
+		{
+			if(strcmp(temp1->word,temp2->word) > 0)
+			{
+				tempWord = temp1->word;
+				tempCount = temp1->wordCount;
+				
+                		temp1->word = temp2->word;
+                		temp2->word = tempWord;
+                		temp1->wordCount = temp2->wordCount;
+                		temp2->wordCount = tempCount;
+			}
+		}
+	}
 
 }
 //TODO
