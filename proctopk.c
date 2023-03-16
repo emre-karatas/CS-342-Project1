@@ -12,74 +12,99 @@
 // a data structure to keep words and counts together. This is a linked list application.
 struct dataItem
 {
-	char* word;
-	struct dataItem* next;
-	struct dataItem* previous;
-	int wordCount;
+    char* word;
+    struct dataItem* next;
+    struct dataItem* previous;
+    int wordCount;
 };
+
 struct dataItem* head = NULL;
-// function to push word count and word itself to the linked list structure
+struct dataItem* tail = NULL;
+
 struct dataItem* pushData(struct dataItem* head, char* word)
 {
-	if (head == NULL)
-	{
-		struct dataItem* newDataItem = (struct dataItem*)malloc(sizeof(struct dataItem)); 
-  
-    		newDataItem->word  = word; 
-  
-    		newDataItem->wordCount = 1; 
-    		
-    		newDataItem->previous = NULL;
-    		
-    		newDataItem->next = head;
-    	
-    		head = newDataItem; 
-    	
-	
-	}
-	else
-	{
-	 	if ( strcmp(word,head->word) < 0 ) 
-	 	{
-            		head->previous = pushData(head->previous, word);
-        	}
-        	else if ( strcmp(word,head->word) > 0) 
-        	{
-            		head->next = pushData(head->next, word);
-        	}
-        	else 
-        	{
-            		head->wordCount = head->wordCount + 1;
-        	}
-    	}
+    // Check if the word already exists in the linked list
+    struct dataItem* current = head;
+    while (current != NULL) {
+        if (strcmp(current->word, word) == 0) {
+            current->wordCount++;
+            return head;
+        }
+        current = current->next;
+    }
+    
+    // If the word does not exist, create a new node for it
+    struct dataItem* newItem = (struct dataItem*)malloc(sizeof(struct dataItem));
+    if (newItem == NULL) {
+        // Handle memory allocation error
+        printf("Memory allocation error\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    newItem->word = strdup(word);
+    if (newItem->word == NULL) {
+        // Handle memory allocation error
+        printf("Memory allocation error\n");
+        free(newItem);
+        exit(EXIT_FAILURE);
+    }
+    
+    newItem->wordCount = 1; 
+    newItem->next = NULL;
+    newItem->previous = tail;
+    
+    if (head == NULL) {
+        head = newItem;
+    }
+    
+    if (tail != NULL) {
+        tail->next = newItem;
+    }
+    
+    tail = newItem;
+    
     return head;
-	
 }
- 
-void sortDataItems(struct dataItem* anItem)
-{
-	char* tempWord;
-	int tempCount;
-	struct dataItem *temp1;
-	struct dataItem *temp2;
-	for(temp1 = anItem; temp1!=NULL; temp1 = temp1->next)
-	{
-		for(temp2=temp1->next;temp2!=NULL;temp2=temp2->next)
-		{
-			if(strcmp(temp1->word,temp2->word) > 0)
-			{
-				tempWord = temp1->word;
-				tempCount = temp1->wordCount;
-				
-                		temp1->word = temp2->word;
-                		temp2->word = tempWord;
-                		temp1->wordCount = temp2->wordCount;
-                		temp2->wordCount = tempCount;
-			}
-		}
-	}
 
+
+void swap(struct dataItem* a, struct dataItem* b) {
+    char* tempWord = a->word;
+    int tempCount = a->wordCount;
+    a->word = b->word;
+    a->wordCount = b->wordCount;
+    b->word = tempWord;
+    b->wordCount = tempCount;
 }
+
+
+void selectionSort(struct dataItem* start) 
+{
+    if (start == NULL) 
+    {
+        return;
+    }
+    
+    struct dataItem* ptr1, * ptr2, * min;
+    
+    for (ptr1 = start; ptr1->next != NULL; ptr1 = ptr1->next) 
+    {
+        min = ptr1;
+        
+        for (ptr2 = ptr1->next; ptr2 != NULL; ptr2 = ptr2->next) 
+        {
+            if (ptr2->wordCount > min->wordCount) 
+            {
+                min = ptr2;
+            }
+        }
+        
+        if (min != ptr1) 
+        {
+            swap(ptr1, min);
+        }
+    }
+}
+
 void readFiles(char* fileName)
 {
 	FILE* file;
@@ -89,10 +114,7 @@ void readFiles(char* fileName)
 	
 	while ( fscanf(file, "%s", word) == 1 ) 
 	{
-
-        	// might leak memory
         	current = strdup(word);
-        
         	for ( int i = 0; current[i] != '\0'; i++ ) 
         	{
             		if ( current[i] >= 'a' && current[i] <= 'z' ) 
@@ -100,35 +122,37 @@ void readFiles(char* fileName)
                 		current[i] = current[i] - 32;
             		}
             	}
+            	head = pushData(head, current);
+		free(current); // free the allocated memory after using it
         }
-        head = pushData(head, current);
+    fclose(file);
 }
-void printData(struct dataItem* head, FILE* outputFile, int* count) {
-    if ( head == NULL ) 
-    {
+
+
+
+void printData(struct dataItem* head, FILE* outputFile) {
+    if (head == NULL) {
         return;
     }
-    if ( (*count) == 0 ) 
-    {
-        fprintf(outputFile, "%s %d", head->word, head->wordCount);
-    }
-    else 
-    {
-        fprintf(outputFile, "\n%s %d", head->word, head->wordCount);
-    }
-    (*count)++;
-    printData(head->next, outputFile, count);
+    fprintf(outputFile, "%s %d\n", head->word, head->wordCount);
+    printData(head->next, outputFile);
 }
 
 void printOutputFile()
 {
-	FILE* outputFile;
-    	outputFile = fopen("out.txt", "w");
-    	int count = 0;
-
-    	printData(head, outputFile, &count);
-    	fclose(outputFile);
+    FILE* outputFile = fopen("out.txt", "w");
+    if (outputFile == NULL) {
+        perror("Error opening output file");
+        exit(EXIT_FAILURE);
+    }
+    selectionSort(head);
+    printData(head, outputFile);
+    if (fclose(outputFile) != 0) {
+        perror("Error closing output file");
+        exit(EXIT_FAILURE);
+    }
 }
+
 //TODO
 int main(int argc, char* argv[])
 {
