@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
 #include <unistd.h>
-#include <mqueue.h>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/mman.h>
+#include <string.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+
+#define MAX_FILES 100
 
 // Ipek Oztas - Emre Karatas
 // a data structure to keep words and counts together. This is a linked list application.
@@ -130,24 +129,26 @@ void readFiles(char* fileName)
 }
 
 
-
-void printData(struct dataItem* head, FILE* outputFile) {
-    if (head == NULL) {
+void printData(struct dataItem* head, FILE* outputFile, int* count) {
+    if (head == NULL || *count <= 0) {
         return;
     }
     fprintf(outputFile, "%s %d\n", head->word, head->wordCount);
-    printData(head->next, outputFile);
+    (*count)--;
+    printData(head->next, outputFile, count);
 }
 
-void printOutputFile()
-{
-    FILE* outputFile = fopen("out.txt", "w");
+
+/* Function to write output file */
+void printOutputFile(char* outputFileName, int topKWords) {
+    int count = topKWords;
+    FILE* outputFile = fopen(outputFileName, "w");
     if (outputFile == NULL) {
         perror("Error opening output file");
         exit(EXIT_FAILURE);
     }
     selectionSort(head);
-    printData(head, outputFile);
+    printData(head, outputFile, &count);
     if (fclose(outputFile) != 0) {
         perror("Error closing output file");
         exit(EXIT_FAILURE);
@@ -155,105 +156,72 @@ void printOutputFile()
 }
 
 
-int main(int argc, char* argv[])
-{
-    printf ("this is parent with pid is: %d\n", getpid());
 
-    /* the size (in bytes) of shared memory object */
+int main(int argc, char* argv[]) {
+    printf("This is parent with pid: %d\n", getpid());
+
     const int SIZE = 4096;
-    /* name of the shared memory object */
     const char *name = "OS";
-    /* strings written to shared memory */
     const char *message_0 = "Hello";
     const char *message_1 = "World!";
-    /* shared memory file descriptor */
     int fd;
-    /* pointer to shared memory obect */
     char *ptr;
-    /* create the shared memory object */
-    fd = shm_open(name,O_CREAT | O_RDWR,0666);
-    /* configure the size of the shared memory object */
+    fd = shm_open(name, O_CREAT | O_RDWR, 0666);
     ftruncate(fd, SIZE);
-    /* memory map the shared memory object */
-    ptr = (char *)
-    mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    
+    ptr = (char *) mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-
-	if ( argc < 5 ) {
-        printf("You have entered insufficient number of arguments! Usage: proctopk <K> <outfile> <N> <infile1> .... <infileN>\n");
+    if (argc < 5) {
+        printf("You have entered an insufficient number of arguments! Usage: proctopk <K> <outfile> <N> <infile1> .... <infileN>\n");
         return -1;
     }
-    
-    char* outfile = argv[3];
-    int N= atoi(argv[4]);
-    printf("%d", N);
-    char* fileNames[N];
-    for ( int i = 0; i < N; i++ ) {
-        fileNames[i] = argv[i + 5];
-    }
-    
-    readFiles("in1.txt");
-    FILE* outputFile;
-    outputFile = fopen(outfile, "w");
-    printOutputFile();
-    
-    fclose(outputFile);
-
-    pid_t n;
-    int k,r;
-    unsigned int s;
+    int topKWords = atoi(argv[1]);
+    char* outfile = argv[2];
+    int N = atoi(argv[3]);
+    char* fileNames[MAX_FILES];
     for (int i = 0; i < N; i++) {
-        pid_t pid, pid1;
-        /* fork a child process */
+        fileNames[i] = argv[i + 4];
+    }
+
+    // Call readFiles function for each input file
+    for (int i = 0; i < N; i++) {
+        readFiles(fileNames[i]);
+    }
+
+    // Call printOutputFile to write output to file
+    printOutputFile(outfile,topKWords);
+    printf("done");
+
+    // Create child processes
+    pid_t pid;
+    for (int i = 0; i < N; i++) {
         pid = fork();
-        if (pid < 0) { /* error occurred */
-            fprintf(stderr, "Fork Failed");
+        if (pid < 0) {
+            fprintf(stderr, "Fork failed\n");
             return 1;
         }
-        else if (pid == 0) { /* child process */
-            pid1 = getpid();
-            //printf("child: pid = %d",pid); /* A */
-            //printf("child: pid1 = %d",pid1); /* B */
-            /* write to the shared memory object */
-            
-            printf("child process %d with ID %d and parent ID %d is created\n", i+1, getpid(), getppid());
-           
+        else if (pid == 0) { // child process
+            printf("Child process %d with ID %d and parent ID %d is created\n", i+1, getpid(), getppid());
+
+            // Write to shared memory
             char s[] = "ipek";
             memcpy(ptr, s, sizeof(char) * 4);
 
             ptr += sizeof(char)*4;
-            printf("%s", "sorun yok");
 
             exit(0);
         }
-        else { /* parent process */
-            pid1 = getpid();
-            //printf("parent: pid = %d",pid); /* C */
-            //printf("parent: pid1 = %d",pid1); /* D */
-            wait(NULL);
-        }
     }
 
-    for (int i = 0; i < 3; i++){
+    // Wait for all child processes to finish
+    for (int i = 0; i < N; i++) {
         wait(NULL);
     }
 
-    
+    // Read from shared memory
+    printf("%s\n", (char *)ptr);
 
-    
-
-    /* open the shared memory object */
-    //fd = shm_open(name, O_RDONLY, 0666);
-    /* memory map the shared memory object */
-    ptr = (char *)
-    mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    /* read from the shared memory object */
-    printf("%s",(char *)ptr);
-
-    /* remove the shared memory object */
+    // Remove shared memory object
     shm_unlink(name);
+
     return 0;
-    
-    
 }
