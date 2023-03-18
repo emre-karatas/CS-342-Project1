@@ -1,10 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <sys/wait.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <mqueue.h>
+#include <time.h>
+#include <sys/time.h>
 #include <sys/mman.h>
-#include <fcntl.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
+#include <sys/wait.h>
 
 #define MAX_FILES 100
 
@@ -127,8 +132,6 @@ void readFiles(char* fileName)
         }
     fclose(file);
 }
-
-
 void printData(struct dataItem* head, FILE* outputFile, int* count) {
     if (head == NULL || *count <= 0) {
         return;
@@ -155,73 +158,93 @@ void printOutputFile(char* outputFileName, int topKWords) {
     }
 }
 
+void printDataToSharedMem(struct dataItem* head, char *ptr, int* count) {
+    if (head == NULL || *count <=0) {
+        return;
+    }
+    //memcpy(ptr, s , sizeof(char)*strlen(s));
+    sprintf(ptr, "%s %d\n", head->word, head->wordCount);
+    (*count)--;
+    printDataToSharedMem(head->next, ptr+256, count);
+}
+
+void printToSharedMem(char *ptr, int topKWords)
+{
+    int count = topKWords;
+    selectionSort(head);
+    printDataToSharedMem(head, ptr, &count);
+}
 
 
-int main(int argc, char* argv[]) {
-    printf("This is parent with pid: %d\n", getpid());
+int main(int argc, char* argv[])
+{
+    int shmid;
+    char *shmaddr;
+    int i;
+    const int SHM_SIZE = 4096;
 
-    const int SIZE = 4096;
-    const char *name = "OS";
-    const char *message_0 = "Hello";
-    const char *message_1 = "World!";
-    int fd;
-    char *ptr;
-    fd = shm_open(name, O_CREAT | O_RDWR, 0666);
-    ftruncate(fd, SIZE);
-    ptr = (char *) mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    // Create shared memory
+    if ((shmid = shmget(IPC_PRIVATE, SHM_SIZE, IPC_CREAT | 0666)) < 0) {
+        perror("shmget");
+        exit(1);
+    }
 
-    if (argc < 5) {
-        printf("You have entered an insufficient number of arguments! Usage: proctopk <K> <outfile> <N> <infile1> .... <infileN>\n");
+    // Attach shared memory
+    if ((shmaddr = shmat(shmid, NULL, 0)) == (char *) -1) {
+        perror("shmat");
+        exit(1);
+    }
+
+    if ( argc < 5 ) {
+        printf("You have entered insufficient number of arguments! Usage: proctopk <K> <outfile> <N> <infile1> .... <infileN>\n");
         return -1;
     }
+    
     int topKWords = atoi(argv[1]);
     char* outfile = argv[2];
-    int N = atoi(argv[3]);
-    char* fileNames[MAX_FILES];
-    for (int i = 0; i < N; i++) {
+    int N= atoi(argv[3]);
+    pid_t pid[N];
+    char* fileNames[N];
+    for ( int i = 0; i < N; i++ ) {
         fileNames[i] = argv[i + 4];
     }
-
-    // Call readFiles function for each input file
-    for (int i = 0; i < N; i++) {
-        readFiles(fileNames[i]);
-    }
-
-    // Call printOutputFile to write output to file
-    printOutputFile(outfile,topKWords);
-    printf("done");
-
     // Create child processes
-    pid_t pid;
-    for (int i = 0; i < N; i++) {
-        pid = fork();
-        if (pid < 0) {
-            fprintf(stderr, "Fork failed\n");
-            return 1;
-        }
-        else if (pid == 0) { // child process
-            printf("Child process %d with ID %d and parent ID %d is created\n", i+1, getpid(), getppid());
-
-            // Write to shared memory
-            char s[] = "ipek";
-            memcpy(ptr, s, sizeof(char) * 4);
-
-            ptr += sizeof(char)*4;
-
+    for (i = 0; i < N; i++) {
+        pid[i] = fork();
+        if (pid[i] == -1) {
+            perror("fork");
+            exit(1);
+        } else if (pid[i] == 0) {
+            // Child process writes to shared memory
+            readFiles(fileNames[i]);
+            printToSharedMem(shmaddr+(i*256),topKWords);
+            //sprintf(shmaddr+(i*256), "Child %d wrote to shared memory.", i+1);
             exit(0);
         }
     }
 
-    // Wait for all child processes to finish
-    for (int i = 0; i < N; i++) {
-        wait(NULL);
+    readFiles(fileNames[0]);
+    printOutputFile(outfile, topKWords);
+    
+    // Wait for child processes to complete
+    for (i = 0; i < N; i++) {
+        waitpid(pid[i], NULL, 0);
     }
 
-    // Read from shared memory
-    printf("%s\n", (char *)ptr);
+    // Print contents of shared memory
+    for (int i = 0; i <topKWords*N; i++){
+        printf("K is %d N is %d", topKWords, N);
+        printf("%s\n", shmaddr+(i*256));
 
-    // Remove shared memory object
-    shm_unlink(name);
+    }
+    // Detach and remove shared memory
+    shmdt(shmaddr);
+    shmctl(shmid, IPC_RMID, NULL);
 
     return 0;
 }
+
+
+
+
+    
