@@ -304,8 +304,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    readFiles(fileNames[0]);
-    readFiles(fileNames[1]);
+   
     //printOutputFile(outfile, topKWords);
     
     // Wait for child processes to complete
@@ -317,7 +316,7 @@ int main(int argc, char* argv[])
     FILE* temp = fopen(fileN, "w");
     // Print contents of shared memory
     for (int i = 0; i <topKWords*N; i++){
-        printf("%s\n", shmaddr+(i*256));
+        //printf("%s\n", shmaddr+(i*256));
         fprintf(temp, "%s\n", shmaddr+(i*256));
 
     }
