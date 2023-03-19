@@ -217,24 +217,27 @@ int main(int argc, char* argv[])
         } else if (pid[i] == 0) {
             // Child process writes to shared memory
             readFiles(fileNames[i]);
-            printToSharedMem(shmaddr+(i*256),topKWords);
+            printToSharedMem(shmaddr+(i*topKWords*256),topKWords);
             //sprintf(shmaddr+(i*256), "Child %d wrote to shared memory.", i+1);
             exit(0);
         }
     }
 
     readFiles(fileNames[0]);
+    readFiles(fileNames[1]);
     printOutputFile(outfile, topKWords);
     
     // Wait for child processes to complete
     for (i = 0; i < N; i++) {
         waitpid(pid[i], NULL, 0);
     }
-
+    char* fileN;
+    fileN = "tempFile.txt";
+    FILE* temp = fopen(fileN, "w");
     // Print contents of shared memory
     for (int i = 0; i <topKWords*N; i++){
-        printf("K is %d N is %d", topKWords, N);
         printf("%s\n", shmaddr+(i*256));
+        fprintf(temp, "%s\n", shmaddr+(i*256));
 
     }
     // Detach and remove shared memory
