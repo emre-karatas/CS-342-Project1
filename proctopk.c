@@ -12,9 +12,18 @@
 #include <sys/wait.h>
 
 #define MAX_FILES 100
+#define MAX_FREQS 1000
+#define MAX_WORD_LEN 50
+
 
 // Ipek Oztas - Emre Karatas
 // a data structure to keep words and counts together. This is a linked list application.
+
+typedef struct {
+    char word[MAX_WORD_LEN];
+    int count;
+} WordFreq;
+
 struct dataItem
 {
     char* word;
@@ -175,6 +184,78 @@ void printToSharedMem(char *ptr, int topKWords)
     printDataToSharedMem(head, ptr, &count);
 }
 
+int compare_freqs(const void *a, const void *b) {
+    WordFreq *f1 = (WordFreq*) a;
+    WordFreq *f2 = (WordFreq*) b;
+    return f2->count - f1->count;
+}
+
+
+   void top_k_words(char* filename, char* outputFilename, int k) {
+    // Open input file for reading
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    // Read file into frequency list
+    WordFreq freqs[MAX_FREQS];
+    int num_freqs = 0;
+    char word[MAX_WORD_LEN];
+    int count;
+    int found;
+    while (fscanf(fp, "%s %d", word, &count) == 2) {
+        found = 0;
+        for (int i = 0; i < num_freqs; i++) {
+            if (strcmp(word, freqs[i].word) == 0) {
+                freqs[i].count += count;
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            if (num_freqs == MAX_FREQS) {
+                break;
+            }
+            strncpy(freqs[num_freqs].word, word, MAX_WORD_LEN);
+            freqs[num_freqs].count = count;
+            num_freqs++;
+        }
+    }
+    fclose(fp);
+
+    // Sort frequency list by count
+    qsort(freqs, num_freqs, sizeof(WordFreq), compare_freqs);
+
+    // Create result list of top-K words
+    char **top_words = (char**) malloc(k * sizeof(char*));
+    int *top_counts = (int*) malloc(k*sizeof(int));
+    for (int i = 0; i < k; i++) {
+        top_words[i] = (char*) malloc(MAX_WORD_LEN * sizeof(char));
+        strncpy(top_words[i], freqs[i].word, MAX_WORD_LEN);
+        top_counts[i] = freqs[i].count;
+    }
+
+    // Write result list to output file
+    FILE *out_fp = fopen(outputFilename, "w");
+    if (out_fp == NULL) {
+        perror("Error opening output file");
+        return;
+    }
+    for (int i = 0; i < k; i++) {
+        fprintf(out_fp, "%s %d\n", top_words[i], top_counts[i]);
+    }
+    fclose(out_fp);
+
+    // Free memory
+    for (int i = 0; i < k; i++) {
+        free(top_words[i]);
+    }
+    free(top_words);
+    free(top_counts);
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -225,7 +306,7 @@ int main(int argc, char* argv[])
 
     readFiles(fileNames[0]);
     readFiles(fileNames[1]);
-    printOutputFile(outfile, topKWords);
+    //printOutputFile(outfile, topKWords);
     
     // Wait for child processes to complete
     for (i = 0; i < N; i++) {
@@ -240,6 +321,10 @@ int main(int argc, char* argv[])
         fprintf(temp, "%s\n", shmaddr+(i*256));
 
     }
+    fclose(temp);
+    //combine information in shared memory
+    top_k_words(fileN, outfile, topKWords);
+
     // Detach and remove shared memory
     shmdt(shmaddr);
     shmctl(shmid, IPC_RMID, NULL);
