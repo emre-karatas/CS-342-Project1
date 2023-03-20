@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/mman.h>
-#include <fcntl.h>
 #include <string.h>
-#define SHM_SIZE 1024
-#define MAX_FILENAMES 10
+#include <pthread.h>
+#include <sys/wait.h>
 
+#define MAX_FILES 100
+#define MAX_WORD_LEN 64
 
 // Ipek Oztas - Emre Karatas
 // a data structure to keep words and counts together. This is a linked list application.
@@ -20,14 +18,14 @@ struct dataItem
     int wordCount;
 };
 
-struct shared_data {
-    int remaining_children;
-    char data[SHM_SIZE];
+struct thread_arg 
+{
+    int threadCounter;
+    char* filename;
 };
 
-struct dataItem* head = NULL;
-struct dataItem* tail = NULL;
 
+struct dataItem* tail = NULL;
 struct dataItem* pushData(struct dataItem* head, char* word)
 {
     // Check if the word already exists in the linked list
@@ -35,6 +33,7 @@ struct dataItem* pushData(struct dataItem* head, char* word)
     while (current != NULL) {
         if (strcmp(current->word, word) == 0) {
             current->wordCount++;
+            printf("current is increased. current : %s, count is: %d \n", current->word,current->wordCount);
             return head;
         }
         current = current->next;
@@ -69,9 +68,58 @@ struct dataItem* pushData(struct dataItem* head, char* word)
     }
     
     tail = newItem;
-    
+    printf("tail is : %s, count is: %d \n", tail->word,tail->wordCount);
     return head;
 }
+
+struct dataItem* finalPushData(struct dataItem* head, char* word, int count)
+{
+    // Check if the word already exists in the linked list
+    struct dataItem* current = head;
+    while (current != NULL) {
+        if (strcmp(current->word, word) == 0) 
+        {
+            current->wordCount = count;
+            printf("copied %s ",current->word);
+            return head;
+        }
+        current = current->next;
+    }
+    
+    // If the word does not exist, create a new node for it
+    struct dataItem* newItem = (struct dataItem*)malloc(sizeof(struct dataItem));
+    if (newItem == NULL) {
+        // Handle memory allocation error
+        printf("Memory allocation error\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    newItem->word = strdup(word);
+    if (newItem->word == NULL) {
+        // Handle memory allocation error
+        printf("Memory allocation error\n");
+        free(newItem);
+        exit(EXIT_FAILURE);
+    }
+    
+    newItem->wordCount = count; 
+    newItem->next = NULL;
+    newItem->previous = tail;
+    
+    if (head == NULL) {
+        head = newItem;
+    }
+    
+    if (tail != NULL) {
+        tail->next = newItem;
+    }
+    
+    tail = newItem;
+    printf("tail is : %s, count is: %d \n", tail->word,tail->wordCount);
+    return head;
+}
+
+
 
 
 void swap(struct dataItem* a, struct dataItem* b) {
@@ -112,65 +160,125 @@ void selectionSort(struct dataItem* start)
     }
 }
 
-void readFiles(int numFiles, char* fileNames[])
+
+/* Function to write output file */
+void printOutputFile(char* outputFileName, struct dataItem* finalList, int topKWords) 
 {
-    char word[64];
-    char* current;
-    
-    for (int i = 0; i < numFiles; i++) {
-        FILE* file = fopen(fileNames[i], "r");
-        if (file == NULL) {
-            printf("Could not open file %s\n", fileNames[i]);
-            continue;
-        }
-        
-        while (fscanf(file, "%s", word) == 1) {
-            current = strdup(word);
-            for (int j = 0; current[j] != '\0'; j++) {
-                if (current[j] >= 'a' && current[j] <= 'z') {
-                    current[j] = current[j] - 32;
-                }
-            }
-            head = pushData(head, current);
-            free(current);
-        }
-        
-        fclose(file);
-    }
-}
-
-
-void printData(struct dataItem* head, FILE* outputFile) {
-    if (head == NULL) {
-        return;
-    }
-    fprintf(outputFile, "%s %d\n", head->word, head->wordCount);
-    printData(head->next, outputFile);
-}
-
-void printOutputFile(char* outfile, int wordCount, struct dataItem* data) {
-    FILE* outputFile = fopen(outfile, "w");
-    if (outputFile == NULL) {
+    FILE* outputFile = fopen(outputFileName, "w");
+    if (outputFile == NULL) 
+    {
         perror("Error opening output file");
         exit(EXIT_FAILURE);
     }
-
-    // Sort the data by word count
-    selectionSort(data);
-
-    // Write the data to the output file
-    for (int i = 0; i < wordCount; i++) {
-        fprintf(outputFile, "%s %d\n", data[i].word, data[i].wordCount);
+    int count = topKWords;
+    while (finalList != NULL && count > 0) 
+    {
+        fprintf(outputFile, "%s %d\n", finalList->word, finalList->wordCount);
+        finalList = finalList->next;
+        count--;
     }
-
-    if (fclose(outputFile) != 0) {
+    if (fclose(outputFile) != 0) 
+    {
         perror("Error closing output file");
         exit(EXIT_FAILURE);
     }
 }
 
-int main()
+struct dataItem** headPointer = NULL;
+struct dataItem* parent = NULL;
+void* thread_func(void* arguments);
+
+void checkThreads(struct dataItem** parent, struct dataItem* root)
 {
-	// todo
+	if(root == NULL)
+	{
+	    return;
+	}
+	else
+	{
+		*parent = finalPushData(*parent, root->word,root->wordCount);
+    		checkThreads(parent, root->next);
+		
+		
+	}
 }
+
+
+int main(int argc, char* argv[])
+{
+    if (argc < 4) 
+    {
+        printf("Usage: threadtopk <K> <outfile> <N> <infile1> .... <infileN>\n");
+        exit(EXIT_FAILURE);
+    }
+
+    int K = atoi(argv[1]);
+    char* outputFileName = argv[2];
+    int N = atoi(argv[3]);
+    char* inputFiles[N];
+    headPointer = malloc(sizeof(struct dataItem*) * N);
+    struct thread_arg threadArguments[N];
+    pthread_t threads[N];
+
+    for (int i = 0; i < N; i++) 
+    {
+        inputFiles[i] = argv[i + 4];
+    }
+   for (int i = 0; i < N; i++) 
+    {
+        threadArguments[i].threadCounter = i;   
+        threadArguments[i].filename = inputFiles[i];
+        pthread_create(&threads[i], NULL, &thread_func, (void*) &threadArguments[i]);
+        printf("thread %i with tid %u created\n", i,
+		       (unsigned int) threads[i]);
+    }
+    for ( int i = 0; i < N; i++ ) 
+    {
+        pthread_join(threads[i], NULL);
+        printf("thread %i with tid %u joined\n", i,
+		       (unsigned int) threads[i]);
+    }
+    for ( int i = 0; i < N; i++ ) 
+    {
+        checkThreads(&parent, headPointer[i]);
+        printf("thread %i with tid %u checked\n", i,
+		       (unsigned int) threads[i]);
+    }
+    selectionSort(parent);
+    printOutputFile(outputFileName,parent,K);
+    return 0;
+
+}
+void* thread_func(void* arguments)
+{
+    struct thread_arg* args = (struct thread_arg*) arguments;
+    char* fileName = (*args).filename;
+    int threadCounter = (*args).threadCounter;
+    FILE* file;
+    char word[64];
+    file = fopen(fileName, "r");
+    headPointer[threadCounter] = NULL;
+
+    while ( fscanf(file, "%s", word) == 1 ) 
+    {
+
+        char* current = strdup(word);
+        
+        for ( int i = 0; current[i] != '\0'; i++ ) 
+        {
+        
+            if ( current[i] >= 'a' && current[i] <= 'z' ) 
+            {
+                current[i] = current[i] - 32;
+            }
+        }
+        
+        headPointer[threadCounter] = pushData(headPointer[threadCounter], current);
+    }
+
+    fclose(file);
+    pthread_exit(0);
+}
+
+
 
