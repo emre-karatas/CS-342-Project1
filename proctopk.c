@@ -13,7 +13,7 @@
 
 #define MAX_FILES 100
 #define MAX_FREQS 1000
-#define MAX_WORD_LEN 50
+#define MAX_WORD_LEN 64
 
 
 // Ipek Oztas - Emre Karatas
@@ -330,8 +330,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
-
-
-
-    
