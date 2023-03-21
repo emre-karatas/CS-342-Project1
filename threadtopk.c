@@ -33,7 +33,7 @@ struct dataItem* pushData(struct dataItem* head, char* word)
     while (current != NULL) {
         if (strcmp(current->word, word) == 0) {
             current->wordCount++;
-            printf("current is increased. current : %s, count is: %d \n", current->word,current->wordCount);
+            //printf("current is increased. current : %s, count is: %d \n", current->word,current->wordCount);
             return head;
         }
         current = current->next;
@@ -68,10 +68,10 @@ struct dataItem* pushData(struct dataItem* head, char* word)
     }
     
     tail = newItem;
-    printf("tail is : %s, count is: %d \n", tail->word,tail->wordCount);
+    //printf("tail is : %s, count is: %d \n", tail->word,tail->wordCount);
     return head;
 }
-
+struct dataItem* finaltail = NULL;
 struct dataItem* finalPushData(struct dataItem* head, char* word, int count)
 {
     // Check if the word already exists in the linked list
@@ -80,7 +80,7 @@ struct dataItem* finalPushData(struct dataItem* head, char* word, int count)
         if (strcmp(current->word, word) == 0) 
         {
             current->wordCount = count;
-            printf("copied %s ",current->word);
+            //printf("copied %s ",current->word);
             return head;
         }
         current = current->next;
@@ -97,29 +97,27 @@ struct dataItem* finalPushData(struct dataItem* head, char* word, int count)
     newItem->word = strdup(word);
     if (newItem->word == NULL) {
         // Handle memory allocation error
-        printf("Memory allocation error\n");
+        //printf("Memory allocation error\n");
         free(newItem);
         exit(EXIT_FAILURE);
     }
     
     newItem->wordCount = count; 
     newItem->next = NULL;
-    newItem->previous = tail;
+    newItem->previous = finaltail;
     
     if (head == NULL) {
         head = newItem;
     }
     
-    if (tail != NULL) {
-        tail->next = newItem;
+    if (finaltail != NULL) {
+        finaltail->next = newItem;
     }
     
-    tail = newItem;
-    printf("tail is : %s, count is: %d \n", tail->word,tail->wordCount);
+    finaltail = newItem;
+    //printf("tail is : %s, count is: %d \n", tail->word,tail->wordCount);
     return head;
 }
-
-
 
 
 void swap(struct dataItem* a, struct dataItem* b) {
@@ -196,7 +194,7 @@ void checkThreads(struct dataItem** parent, struct dataItem* root)
 	}
 	else
 	{
-		*parent = finalPushData(*parent, root->word,root->wordCount);
+		*parent = finalPushData(*parent,root->word,root->wordCount);
     		checkThreads(parent, root->next);
 		
 		
@@ -229,20 +227,20 @@ int main(int argc, char* argv[])
         threadArguments[i].threadCounter = i;   
         threadArguments[i].filename = inputFiles[i];
         pthread_create(&threads[i], NULL, &thread_func, (void*) &threadArguments[i]);
-        printf("thread %i with tid %u created\n", i,
-		       (unsigned int) threads[i]);
+        //printf("thread %i with tid %u created\n", i,
+		       //(unsigned int) threads[i]);
     }
     for ( int i = 0; i < N; i++ ) 
     {
         pthread_join(threads[i], NULL);
-        printf("thread %i with tid %u joined\n", i,
-		       (unsigned int) threads[i]);
+        //printf("thread %i with tid %u joined\n", i,
+		       //(unsigned int) threads[i]);
     }
     for ( int i = 0; i < N; i++ ) 
     {
         checkThreads(&parent, headPointer[i]);
-        printf("thread %i with tid %u checked\n", i,
-		       (unsigned int) threads[i]);
+        //printf("thread %i with tid %u checked\n", i,
+		       //(unsigned int) threads[i]);
     }
     selectionSort(parent);
     printOutputFile(outputFileName,parent,K);
